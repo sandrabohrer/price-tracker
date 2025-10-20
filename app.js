@@ -1,52 +1,222 @@
-// Configuration
-// Password hash for: AldiWegmansBJs2025!
-// To generate a new hash, use the generatePasswordHash() function in browser console
-const APP_PASSWORD_HASH = '8e2a8c0e74e0f5c35b138f4e9d3c8a7f6b4d1e9c0a5f3b7e2d8c4a6f1b9e3d7c';
-let isScanning = false;
+// ===== CONSTANTS =====
+const STORAGE_KEYS = {
+    IS_LOGGED_IN: 'isLoggedIn',
+    PRICES: 'prices',
+    LAST_SYNC: 'lastSync'
+};
 
-// Password hashing function (SHA-256)
-async function hashPassword(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
+const APP_PASSWORD_HASH = '8e2a8c0e74e0f5c35b138f4e9d3c8a7f6b4d1e9c0a5f3b7e2d8c4a6f1b9e3d7c';
+
+const ERROR_MESSAGES = {
+    CAMERA_ACCESS: 'Unable to access camera. Please check your browser permissions.',
+    INVALID_PRICE: 'Please enter a valid price greater than $0.00',
+    MISSING_FIELDS: 'Please fill in all required fields',
+    STORAGE_ERROR: 'Unable to save data. Please check your browser settings.',
+    LOGIN_FAILED: 'Incorrect password. Please try again.'
+};
+
+// ===== STATE =====
+const AppState = {
+    isScanning: false,
+    currentUser: null
+};
+
+// ===== UTILITY FUNCTIONS =====
+
+/**
+ * Sanitize HTML to prevent XSS attacks
+ */
+function sanitizeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
-// Function to generate password hash (for admin use in console)
+/**
+ * Show toast notification
+ */
+function showToast(message, isSuccess = false) {
+    const toastId = isSuccess ? 'successToast' : 'errorToast';
+    const toast = document.getElementById(toastId);
+    toast.textContent = message;
+    toast.classList.remove('hidden');
+    
+    setTimeout(() => {
+        toast.classList.add('hidden');
+    }, 3000);
+}
+
+/**
+ * Show error message
+ */
+function showError(message) {
+    showToast(message, false);
+}
+
+/**
+ * Show success message
+ */
+function showSuccess(message) {
+    showToast(message, true);
+}
+
+// ===== STORAGE FUNCTIONS =====
+
+/**
+ * Get prices from localStorage with error handling
+ */
+function getPrices() {
+    try {
+        const data = localStorage.getItem(STORAGE_KEYS.PRICES);
+        return data ? JSON.parse(data) : [];
+    } catch (e) {
+        console.error('Error loading prices:', e);
+        showError('Unable to load saved prices');
+        return [];
+    }
+}
+
+/**
+ * Save prices to localStorage with error handling
+ */
+function savePrices(prices) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.PRICES, JSON.stringify(prices));
+        return true;
+    } catch (e) {
+        console.error('Error saving prices:', e);
+        showError(ERROR_MESSAGES.STORAGE_ERROR);
+        return false;
+    }
+}
+
+/**
+ * Get item from localStorage safely
+ */
+function getStorageItem(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch (e) {
+        console.error(`Error reading ${key} from storage:`, e);
+        return null;
+    }
+}
+
+/**
+ * Set item in localStorage safely
+ */
+function setStorageItem(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch (e) {
+        console.error(`Error writing ${key} to storage:`, e);
+        return false;
+    }
+}
+
+// ===== PASSWORD FUNCTIONS =====
+
+/**
+ * Hash password using SHA-256
+ */
+async function hashPassword(password) {
+    try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    } catch (e) {
+        console.error('Error hashing password:', e);
+        throw new Error('Password hashing failed');
+    }
+}
+
+/**
+ * Generate password hash (for admin use in console)
+ */
 async function generatePasswordHash(password) {
     const hash = await hashPassword(password);
     console.log('Password hash:', hash);
     return hash;
 }
 
-// Check if already logged in
-if (localStorage.getItem('isLoggedIn') === 'true') {
-    showApp();
+// ===== VALIDATION FUNCTIONS =====
+
+/**
+ * Validate price input
+ */
+function validatePrice(price) {
+    const parsed = parseFloat(price);
+    if (isNaN(parsed) || parsed <= 0) {
+        return { valid: false, error: ERROR_MESSAGES.INVALID_PRICE };
+    }
+    return { valid: true, value: parsed };
 }
 
-// Login function
-async function login() {
-    const password = document.getElementById('password').value;
-    const hashedPassword = await hashPassword(password);
+/**
+ * Validate barcode input
+ */
+function validateBarcode(barcode) {
+    const trimmed = barcode.trim();
+    if (!trimmed || trimmed.length < 3) {
+        return { valid: false, error: 'Barcode must be at least 3 characters' };
+    }
+    return { valid: true, value: trimmed };
+}
+
+/**
+ * Validate product name
+ */
+function validateProductName(name) {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed.length < 2) {
+        return { valid: false, error: 'Product name must be at least 2 characters' };
+    }
+    return { valid: true, value: trimmed };
+}
+
+// ===== LOGIN/LOGOUT FUNCTIONS =====
+
+/**
+ * Handle login
+ */
+async function handleLogin(event) {
+    event.preventDefault();
     
-    if (hashedPassword === APP_PASSWORD_HASH) {
-        localStorage.setItem('isLoggedIn', 'true');
-        showApp();
-        document.getElementById('loginError').classList.add('hidden');
-    } else {
-        document.getElementById('loginError').classList.remove('hidden');
+    const passwordInput = document.getElementById('password');
+    const password = passwordInput.value;
+    
+    try {
+        const hashedPassword = await hashPassword(password);
+        
+        if (hashedPassword === APP_PASSWORD_HASH) {
+            setStorageItem(STORAGE_KEYS.IS_LOGGED_IN, 'true');
+            showApp();
+            document.getElementById('loginError').classList.add('hidden');
+        } else {
+            document.getElementById('loginError').classList.remove('hidden');
+        }
+    } catch (e) {
+        showError('Login failed. Please try again.');
+        console.error('Login error:', e);
     }
 }
 
-// Logout function
-function logout() {
-    localStorage.removeItem('isLoggedIn');
+/**
+ * Handle logout
+ */
+function handleLogout(event) {
+    event.preventDefault();
+    localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_IN);
     location.reload();
 }
 
-// Show app screen
+/**
+ * Show app screen
+ */
 function showApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appScreen').style.display = 'block';
@@ -54,25 +224,47 @@ function showApp() {
     loadProductList();
 }
 
-// Tab switching
-function switchTab(tabName) {
-    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+// ===== TAB FUNCTIONS =====
+
+/**
+ * Switch between tabs
+ */
+function switchTab(tabName, button) {
+    // Update tab buttons
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+        tab.setAttribute('aria-selected', 'false');
+    });
     
-    event.target.classList.add('active');
-    document.getElementById(tabName + 'Tab').classList.add('active');
+    // Update tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Activate selected tab
+    button.classList.add('active');
+    button.setAttribute('aria-selected', 'true');
+    const tabContent = document.getElementById(tabName + 'Tab');
+    tabContent.classList.add('active');
 
     if (tabName === 'view') {
         loadProductList();
     }
 }
 
-// Start barcode scanner
+// ===== SCANNER FUNCTIONS =====
+
+/**
+ * Start barcode scanner
+ */
 function startScanner() {
     const video = document.getElementById('video');
+    const startBtn = document.getElementById('startScanBtn');
+    const stopBtn = document.getElementById('stopScanBtn');
+    
     video.classList.remove('hidden');
-    document.getElementById('startScanBtn').classList.add('hidden');
-    document.getElementById('stopScanBtn').classList.remove('hidden');
+    startBtn.classList.add('hidden');
+    stopBtn.classList.remove('hidden');
 
     Quagga.init({
         inputStream: {
@@ -88,16 +280,17 @@ function startScanner() {
         }
     }, function(err) {
         if (err) {
-            console.error(err);
-            alert('Camera access denied or not available');
+            console.error('Scanner initialization error:', err);
+            showError(ERROR_MESSAGES.CAMERA_ACCESS);
+            stopScanner();
             return;
         }
         Quagga.start();
-        isScanning = true;
+        AppState.isScanning = true;
     });
 
     Quagga.onDetected(function(result) {
-        if (isScanning) {
+        if (AppState.isScanning) {
             const code = result.codeResult.code;
             stopScanner();
             showPriceComparison(code);
@@ -105,16 +298,39 @@ function startScanner() {
     });
 }
 
-// Stop barcode scanner
+/**
+ * Stop barcode scanner
+ */
 function stopScanner() {
-    Quagga.stop();
-    isScanning = false;
-    document.getElementById('video').classList.add('hidden');
-    document.getElementById('startScanBtn').classList.remove('hidden');
-    document.getElementById('stopScanBtn').classList.add('hidden');
+    if (AppState.isScanning) {
+        Quagga.stop();
+    }
+    AppState.isScanning = false;
+    
+    const video = document.getElementById('video');
+    const startBtn = document.getElementById('startScanBtn');
+    const stopBtn = document.getElementById('stopScanBtn');
+    
+    video.classList.add('hidden');
+    startBtn.classList.remove('hidden');
+    stopBtn.classList.add('hidden');
 }
 
-// Show price comparison
+// ===== PRICE DISPLAY FUNCTIONS =====
+
+/**
+ * Get prices for a specific barcode
+ */
+function getPricesForBarcode(barcode) {
+    const allPrices = getPrices();
+    return allPrices
+        .filter(p => p.barcode === barcode)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
+/**
+ * Show price comparison for scanned barcode
+ */
 function showPriceComparison(barcode) {
     const prices = getPricesForBarcode(barcode);
     const resultDiv = document.getElementById('scanResult');
@@ -122,21 +338,27 @@ function showPriceComparison(barcode) {
     if (prices.length === 0) {
         resultDiv.innerHTML = `
             <div class="comparison-result">
-                <div class="barcode-display">Barcode: ${barcode}</div>
+                <div class="barcode-display">${sanitizeHTML('Barcode: ' + barcode)}</div>
                 <div class="no-data">No prices found for this product. Add one!</div>
-                <button onclick="fillAddForm('${barcode}')">Add Price</button>
+                <button data-barcode="${sanitizeHTML(barcode)}" class="fill-form-btn">Add Price</button>
             </div>
         `;
+        
+        // Add event listener to the dynamically created button
+        resultDiv.querySelector('.fill-form-btn').addEventListener('click', function() {
+            fillAddForm(this.dataset.barcode);
+        });
         return;
     }
 
     // Find best price
     const bestPrice = Math.min(...prices.map(p => p.price));
+    const sanitizedProductName = sanitizeHTML(prices[0].productName);
 
     let html = `
         <div class="comparison-result">
-            <div class="barcode-display">Barcode: ${barcode}</div>
-            <div class="product-name">${prices[0].productName}</div>
+            <div class="barcode-display">${sanitizeHTML('Barcode: ' + barcode)}</div>
+            <div class="product-name">${sanitizedProductName}</div>
     `;
 
     prices.forEach(p => {
@@ -144,8 +366,8 @@ function showPriceComparison(barcode) {
         html += `
             <div class="price-item ${isBest ? 'best-price' : ''}">
                 <div>
-                    <div class="store-name">${p.store}</div>
-                    <div class="date">${new Date(p.date).toLocaleDateString()}</div>
+                    <div class="store-name">${sanitizeHTML(p.store)}</div>
+                    <div class="date">${sanitizeHTML(new Date(p.date).toLocaleDateString())}</div>
                 </div>
                 <div class="price">$${p.price.toFixed(2)}</div>
             </div>
@@ -153,65 +375,89 @@ function showPriceComparison(barcode) {
     });
 
     html += `
-            <button onclick="fillAddForm('${barcode}', '${prices[0].productName}')">Update Price</button>
+            <button data-barcode="${sanitizeHTML(barcode)}" data-product="${sanitizeHTML(prices[0].productName)}" class="update-price-btn">Update Price</button>
         </div>
     `;
 
     resultDiv.innerHTML = html;
+    
+    // Add event listener to the dynamically created button
+    resultDiv.querySelector('.update-price-btn').addEventListener('click', function() {
+        fillAddForm(this.dataset.barcode, this.dataset.product);
+    });
 }
 
-// Fill add form
+/**
+ * Fill the add form with barcode and product name
+ */
 function fillAddForm(barcode, productName = '') {
-    switchTab('add');
-    document.querySelector('.tab:nth-child(2)').click();
+    // Switch to add tab
+    const addTabBtn = document.getElementById('addTabBtn');
+    switchTab('add', addTabBtn);
+    
+    // Fill form fields
     document.getElementById('barcode').value = barcode;
     document.getElementById('productName').value = productName;
+    document.getElementById('price').focus();
 }
 
-// Add price
-function addPrice() {
-    const barcode = document.getElementById('barcode').value.trim();
-    const productName = document.getElementById('productName').value.trim();
-    const store = document.getElementById('store').value;
-    const price = parseFloat(document.getElementById('price').value);
+// ===== PRICE MANAGEMENT FUNCTIONS =====
 
-    if (!barcode || !productName || !price) {
-        alert('Please fill in all fields');
+/**
+ * Handle adding a new price
+ */
+function handleAddPrice(event) {
+    event.preventDefault();
+    
+    const barcodeInput = document.getElementById('barcode').value;
+    const productNameInput = document.getElementById('productName').value;
+    const store = document.getElementById('store').value;
+    const priceInput = document.getElementById('price').value;
+
+    // Validate inputs
+    const barcodeValidation = validateBarcode(barcodeInput);
+    if (!barcodeValidation.valid) {
+        showError(barcodeValidation.error);
+        return;
+    }
+
+    const nameValidation = validateProductName(productNameInput);
+    if (!nameValidation.valid) {
+        showError(nameValidation.error);
+        return;
+    }
+
+    const priceValidation = validatePrice(priceInput);
+    if (!priceValidation.valid) {
+        showError(priceValidation.error);
         return;
     }
 
     const priceData = {
-        barcode,
-        productName,
-        store,
-        price,
+        barcode: barcodeValidation.value,
+        productName: nameValidation.value,
+        store: store,
+        price: priceValidation.value,
         date: new Date().toISOString()
     };
 
     // Save to localStorage
-    let allPrices = JSON.parse(localStorage.getItem('prices') || '[]');
+    const allPrices = getPrices();
     allPrices.push(priceData);
-    localStorage.setItem('prices', JSON.stringify(allPrices));
-
-    // Clear form
-    document.getElementById('barcode').value = '';
-    document.getElementById('productName').value = '';
-    document.getElementById('price').value = '';
-
-    alert('Price added successfully!');
-    updateSyncStatus();
+    
+    if (savePrices(allPrices)) {
+        // Clear form
+        document.getElementById('addPriceForm').reset();
+        showSuccess('Price added successfully!');
+        updateSyncStatus();
+    }
 }
 
-// Get prices for barcode
-function getPricesForBarcode(barcode) {
-    const allPrices = JSON.parse(localStorage.getItem('prices') || '[]');
-    return allPrices.filter(p => p.barcode === barcode)
-        .sort((a, b) => new Date(b.date) - new Date(a.date));
-}
-
-// Load product list
+/**
+ * Load and display product list
+ */
 function loadProductList() {
-    const allPrices = JSON.parse(localStorage.getItem('prices') || '[]');
+    const allPrices = getPrices();
     const listDiv = document.getElementById('productList');
 
     if (allPrices.length === 0) {
@@ -237,16 +483,16 @@ function loadProductList() {
         const bestPrice = Math.min(...product.prices.map(p => p.price));
         
         html += `<div class="comparison-result">`;
-        html += `<div class="product-name">${product.name}</div>`;
-        html += `<div class="barcode-display">Barcode: ${barcode}</div>`;
+        html += `<div class="product-name">${sanitizeHTML(product.name)}</div>`;
+        html += `<div class="barcode-display">${sanitizeHTML('Barcode: ' + barcode)}</div>`;
         
         product.prices.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(p => {
             const isBest = p.price === bestPrice;
             html += `
                 <div class="price-item ${isBest ? 'best-price' : ''}">
                     <div>
-                        <div class="store-name">${p.store}</div>
-                        <div class="date">${new Date(p.date).toLocaleDateString()}</div>
+                        <div class="store-name">${sanitizeHTML(p.store)}</div>
+                        <div class="date">${sanitizeHTML(new Date(p.date).toLocaleDateString())}</div>
                     </div>
                     <div class="price">$${p.price.toFixed(2)}</div>
                 </div>
@@ -259,32 +505,92 @@ function loadProductList() {
     listDiv.innerHTML = html;
 }
 
-// Sync data (placeholder for Firebase)
-function syncData() {
-    // This is a placeholder for future Firebase integration
-    // For now, it just updates the sync status
+// ===== SYNC FUNCTIONS =====
+
+/**
+ * Sync data (placeholder for Firebase)
+ */
+function handleSync() {
     updateSyncStatus();
-    alert('Sync functionality will be added with Firebase integration!');
+    showSuccess('Sync functionality will be added with Firebase integration!');
 }
 
-// Update sync status
+/**
+ * Update sync status display
+ */
 function updateSyncStatus() {
-    const lastSync = localStorage.getItem('lastSync');
+    const lastSync = getStorageItem(STORAGE_KEYS.LAST_SYNC);
     const statusDiv = document.getElementById('syncStatus');
     
     if (lastSync) {
-        const date = new Date(lastSync);
-        statusDiv.textContent = `Last synced: ${date.toLocaleString()}`;
+        try {
+            const date = new Date(lastSync);
+            statusDiv.textContent = `Last synced: ${date.toLocaleString()}`;
+        } catch (e) {
+            statusDiv.textContent = 'Last synced: Never (local only)';
+        }
     } else {
         statusDiv.textContent = 'Last synced: Never (local only)';
     }
     
-    localStorage.setItem('lastSync', new Date().toISOString());
+    setStorageItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
 }
 
-// Allow Enter key to login
-document.getElementById('password').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        login();
+// ===== INITIALIZATION =====
+
+/**
+ * Initialize event listeners
+ */
+function initializeEventListeners() {
+    // Login
+    document.getElementById('loginBtn').addEventListener('click', handleLogin);
+    document.getElementById('password').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleLogin(e);
+        }
+    });
+    
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    
+    // Tabs
+    document.getElementById('scanTabBtn').addEventListener('click', function() {
+        switchTab('scan', this);
+    });
+    document.getElementById('addTabBtn').addEventListener('click', function() {
+        switchTab('add', this);
+    });
+    document.getElementById('viewTabBtn').addEventListener('click', function() {
+        switchTab('view', this);
+    });
+    
+    // Scanner
+    document.getElementById('startScanBtn').addEventListener('click', startScanner);
+    document.getElementById('stopScanBtn').addEventListener('click', stopScanner);
+    
+    // Add price form
+    document.getElementById('addPriceForm').addEventListener('submit', handleAddPrice);
+    
+    // Sync
+    document.getElementById('syncBtn').addEventListener('click', handleSync);
+}
+
+/**
+ * Initialize the app
+ */
+function init() {
+    // Set up event listeners
+    initializeEventListeners();
+    
+    // Check if already logged in
+    if (getStorageItem(STORAGE_KEYS.IS_LOGGED_IN) === 'true') {
+        showApp();
     }
-});
+}
+
+// Start the app when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
