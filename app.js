@@ -5,7 +5,7 @@ const STORAGE_KEYS = {
     LAST_SYNC: 'lastSync'
 };
 
-const APP_PASSWORD_HASH = '8e2a8c0e74e0f5c35b138f4e9d3c8a7f6b4d1e9c0a5f3b7e2d8c4a6f1b9e3d7c';
+const APP_PASSWORD_HASH = '1a2f18918af7c60fd88e15bc7b192589a4e1384a4f6f4a7e3843dc6979e345d1';
 
 const ERROR_MESSAGES = {
     CAMERA_ACCESS: 'Unable to access camera. Please check your browser permissions.',
