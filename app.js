@@ -296,6 +296,66 @@ async function hashPassword(password) {
   }
 }
 
+// ===== FORM VALIDATION =====
+
+/**
+ * Validate the add price form and enable/disable submit button
+ */
+function validateAddPriceForm() {
+  const barcode = document.getElementById('barcode').value.trim();
+  const productName = document.getElementById('productName').value.trim();
+  const priceInput = document.getElementById('price');
+  const price = priceInput.value;
+  const sizeValue = document.getElementById('productSizeValue').value.trim();
+  const sizeUnit = document.getElementById('productSizeUnit').value;
+  const addButton = document.getElementById('addPriceBtn');
+  const sizeError = document.getElementById('sizeError');
+  const priceError = document.getElementById('priceError');
+
+  // Clear any previous errors
+  sizeError.style.display = 'none';
+  sizeError.textContent = '';
+  priceError.style.display = 'none';
+  priceError.textContent = '';
+
+  // Check required fields
+  const hasBarcode = barcode.length >= 3;
+  const hasProductName = productName.length >= 2;
+
+  // Validate price
+  const priceNum = parseFloat(price);
+  let hasValidPrice = price !== '' && !isNaN(priceNum) && priceNum > 0;
+
+  // Check if price has more than 2 decimal places
+  if (hasValidPrice) {
+    // Use regex to check decimal places in the actual input value
+    const decimalMatch = price.match(/\.(\d+)$/);
+    if (decimalMatch && decimalMatch[1].length > 2) {
+      hasValidPrice = false;
+      priceError.textContent = 'Price can only have up to 2 decimal places (e.g., 12.99)';
+      priceError.style.display = 'block';
+    }
+  }
+
+  // Check size fields consistency
+  let sizeValid = true;
+  if (sizeValue && !sizeUnit) {
+    sizeValid = false;
+    sizeError.textContent = 'Please select a unit for the size';
+    sizeError.style.display = 'block';
+  } else if (!sizeValue && sizeUnit) {
+    sizeValid = false;
+    sizeError.textContent = 'Please enter a size value';
+    sizeError.style.display = 'block';
+  }
+
+  // Enable button only if all validations pass
+  const isValid = hasBarcode && hasProductName && hasValidPrice && sizeValid;
+  addButton.disabled = !isValid;
+
+  return isValid;
+}
+
 // ===== VALIDATION FUNCTIONS =====
 
 function validatePrice(price) {
@@ -587,6 +647,9 @@ function fillAddForm(barcode, productName = '') {
   document.getElementById('productSizeValue').value = '';
   document.getElementById('productSizeUnit').value = '';
   document.getElementById('price').focus();
+
+  // Trigger validation to update button state
+  validateAddPriceForm();
 }
 
 // ===== PRICE MANAGEMENT FUNCTIONS =====
@@ -766,6 +829,14 @@ function initializeEventListeners() {
 
   document.getElementById('addPriceForm').addEventListener('submit', handleAddPrice);
 
+  // Add real-time validation for the add price form
+  const formInputs = ['barcode', 'productName', 'price', 'productSizeValue', 'productSizeUnit'];
+  formInputs.forEach((inputId) => {
+    const element = document.getElementById(inputId);
+    element.addEventListener('input', validateAddPriceForm);
+    element.addEventListener('change', validateAddPriceForm);
+  });
+
   document.getElementById('syncBtn').addEventListener('click', handleSync);
 }
 
@@ -794,5 +865,6 @@ if (typeof module !== 'undefined' && module.exports) {
     validateProductName,
     sanitizeHTML,
     hashPassword,
+    validateAddPriceForm,
   };
 }

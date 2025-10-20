@@ -86,15 +86,16 @@ button {
   cursor: pointer;
   transition:
     background 0.3s,
-    transform 0.1s;
+    transform 0.1s,
+    opacity 0.3s;
   margin-bottom: 10px;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   background: #5568d3;
 }
 
-button:active {
+button:active:not(:disabled) {
   transform: scale(0.98);
 }
 
@@ -327,4 +328,15 @@ button:disabled {
 .loading {
   opacity: 0.6;
   pointer-events: none;
+}
+
+/* Required field indicator */
+label::after {
+  content: '';
+}
+
+label:has(+ input[required])::after,
+label:has(+ select[required])::after {
+  content: ' *';
+  color: #dc3545;
 }
