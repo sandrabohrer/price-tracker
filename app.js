@@ -1,7 +1,7 @@
 // ===== CONSTANTS =====
 const STORAGE_KEYS = {
   IS_LOGGED_IN: 'isLoggedIn',
-  PRICES: 'prices',
+  PRICE_TRACKER_DATA: 'priceTrackerData',
   LAST_SYNC: 'lastSync',
 };
 
@@ -19,22 +19,229 @@ const ERROR_MESSAGES = {
 const AppState = {
   isScanning: false,
   currentUser: null,
+  db: null,
 };
+
+// ===== PRICE TRACKER DATABASE CLASS =====
+class PriceTrackerDB {
+  constructor() {
+    this.storageKey = STORAGE_KEYS.PRICE_TRACKER_DATA;
+    this.data = this.loadData();
+  }
+
+  loadData() {
+    const stored = localStorage.getItem(this.storageKey);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+    return {
+      products: {},
+      productVariants: {},
+      prices: {},
+      priceHistory: {},
+    };
+  }
+
+  saveData() {
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+      return true;
+    } catch (e) {
+      console.error('Error saving data:', e);
+      return false;
+    }
+  }
+
+  generateId() {
+    return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  parseSize(sizeString) {
+    if (!sizeString || sizeString.trim() === '') return { value: null, unit: null };
+
+    const match = sizeString.trim().match(/^([\d.]+)\s*([a-zA-Z]+)$/);
+    if (match) {
+      return {
+        value: parseFloat(match[1]),
+        unit: match[2].toLowerCase(),
+      };
+    }
+    return { value: null, unit: sizeString };
+  }
+
+  calculateUnitPrice(price, sizeValue) {
+    if (!sizeValue || sizeValue === 0) return null;
+    return parseFloat((price / sizeValue).toFixed(4));
+  }
+
+  addProduct(barcode, productName, brand = '') {
+    const now = new Date().toISOString();
+
+    if (!this.data.products[barcode]) {
+      this.data.products[barcode] = {
+        barcode,
+        productName,
+        brand,
+        createdAt: now,
+        updatedAt: now,
+      };
+    } else {
+      this.data.products[barcode].productName = productName;
+      this.data.products[barcode].brand = brand;
+      this.data.products[barcode].updatedAt = now;
+    }
+
+    this.saveData();
+    return this.data.products[barcode];
+  }
+
+  addProductVariant(barcode, sizeString) {
+    const variantKey = sizeString ? `${barcode}_${sizeString}` : barcode;
+    const { value, unit } = this.parseSize(sizeString);
+
+    if (!this.data.productVariants[variantKey]) {
+      this.data.productVariants[variantKey] = {
+        barcode,
+        size: sizeString || '',
+        sizeValue: value,
+        sizeUnit: unit,
+        createdAt: new Date().toISOString(),
+      };
+      this.saveData();
+    }
+
+    return this.data.productVariants[variantKey];
+  }
+
+  addPrice(barcode, productName, store, price, sizeString = '', notes = '') {
+    const now = new Date().toISOString();
+    const priceId = this.generateId();
+
+    this.addProduct(barcode, productName);
+
+    const variantKey = sizeString ? `${barcode}_${sizeString}` : barcode;
+    if (sizeString) {
+      this.addProductVariant(barcode, sizeString);
+    }
+
+    const variant = this.data.productVariants[variantKey];
+    const unitPrice = variant ? this.calculateUnitPrice(price, variant.sizeValue) : null;
+
+    const historyKey = `${variantKey}_${store}`;
+
+    // Mark previous price as not current
+    Object.values(this.data.prices).forEach((p) => {
+      if (p.variant === variantKey && p.store === store && p.isCurrentPrice) {
+        p.isCurrentPrice = false;
+      }
+    });
+
+    const priceEntry = {
+      id: priceId,
+      barcode,
+      variant: variantKey,
+      store,
+      price: parseFloat(price),
+      date: now,
+      unitPrice,
+      notes,
+      isCurrentPrice: true,
+    };
+
+    this.data.prices[priceId] = priceEntry;
+
+    if (!this.data.priceHistory[historyKey]) {
+      this.data.priceHistory[historyKey] = [];
+    }
+
+    this.data.priceHistory[historyKey].push({
+      id: priceId,
+      price: parseFloat(price),
+      date: now,
+      unitPrice,
+    });
+
+    this.saveData();
+    return priceEntry;
+  }
+
+  updatePrice(priceId, newPrice, notes = '') {
+    const priceEntry = this.data.prices[priceId];
+    if (!priceEntry) {
+      throw new Error('Price entry not found');
+    }
+
+    const now = new Date().toISOString();
+    const variant = this.data.productVariants[priceEntry.variant];
+    const unitPrice = variant ? this.calculateUnitPrice(newPrice, variant.sizeValue) : null;
+
+    priceEntry.price = parseFloat(newPrice);
+    priceEntry.date = now;
+    priceEntry.unitPrice = unitPrice;
+    priceEntry.notes = notes;
+
+    const historyKey = `${priceEntry.variant}_${priceEntry.store}`;
+    const historyEntry = this.data.priceHistory[historyKey]?.find((h) => h.id === priceId);
+    if (historyEntry) {
+      historyEntry.price = parseFloat(newPrice);
+      historyEntry.date = now;
+      historyEntry.unitPrice = unitPrice;
+    }
+
+    this.saveData();
+    return priceEntry;
+  }
+
+  getAllCurrentPricesForBarcode(barcode) {
+    return Object.values(this.data.prices)
+      .filter((p) => p.barcode === barcode && p.isCurrentPrice)
+      .sort((a, b) => a.price - b.price);
+  }
+
+  getPriceHistory(barcode, store, sizeString = '') {
+    const variantKey = sizeString ? `${barcode}_${sizeString}` : barcode;
+    const historyKey = `${variantKey}_${store}`;
+
+    return this.data.priceHistory[historyKey] || [];
+  }
+
+  deletePrice(priceId) {
+    const priceEntry = this.data.prices[priceId];
+    if (!priceEntry) return false;
+
+    delete this.data.prices[priceId];
+
+    const historyKey = `${priceEntry.variant}_${priceEntry.store}`;
+    if (this.data.priceHistory[historyKey]) {
+      this.data.priceHistory[historyKey] = this.data.priceHistory[historyKey].filter(
+        (h) => h.id !== priceId
+      );
+
+      if (this.data.priceHistory[historyKey].length === 0) {
+        delete this.data.priceHistory[historyKey];
+      }
+    }
+
+    this.saveData();
+    return true;
+  }
+
+  exportForFirebase() {
+    return {
+      ...this.data,
+      lastSync: new Date().toISOString(),
+    };
+  }
+}
 
 // ===== UTILITY FUNCTIONS =====
 
-/**
- * Sanitize HTML to prevent XSS attacks
- */
 function sanitizeHTML(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
 }
 
-/**
- * Show toast notification
- */
 function showToast(message, isSuccess = false) {
   const toastId = isSuccess ? 'successToast' : 'errorToast';
   const toast = document.getElementById(toastId);
@@ -46,53 +253,14 @@ function showToast(message, isSuccess = false) {
   }, 3000);
 }
 
-/**
- * Show error message
- */
 function showError(message) {
   showToast(message, false);
 }
 
-/**
- * Show success message
- */
 function showSuccess(message) {
   showToast(message, true);
 }
 
-// ===== STORAGE FUNCTIONS =====
-
-/**
- * Get prices from localStorage with error handling
- */
-function getPrices() {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.PRICES);
-    return data ? JSON.parse(data) : [];
-  } catch (e) {
-    console.error('Error loading prices:', e);
-    showError('Unable to load saved prices');
-    return [];
-  }
-}
-
-/**
- * Save prices to localStorage with error handling
- */
-function savePrices(prices) {
-  try {
-    localStorage.setItem(STORAGE_KEYS.PRICES, JSON.stringify(prices));
-    return true;
-  } catch (e) {
-    console.error('Error saving prices:', e);
-    showError(ERROR_MESSAGES.STORAGE_ERROR);
-    return false;
-  }
-}
-
-/**
- * Get item from localStorage safely
- */
 function getStorageItem(key) {
   try {
     return localStorage.getItem(key);
@@ -102,9 +270,6 @@ function getStorageItem(key) {
   }
 }
 
-/**
- * Set item in localStorage safely
- */
 function setStorageItem(key, value) {
   try {
     localStorage.setItem(key, value);
@@ -117,9 +282,6 @@ function setStorageItem(key, value) {
 
 // ===== PASSWORD FUNCTIONS =====
 
-/**
- * Hash password using SHA-256
- */
 async function hashPassword(password) {
   try {
     const encoder = new TextEncoder();
@@ -134,20 +296,8 @@ async function hashPassword(password) {
   }
 }
 
-/**
- * Generate password hash (for admin use in console)
- */
-async function generatePasswordHash(password) {
-  const hash = await hashPassword(password);
-  console.log('Password hash:', hash);
-  return hash;
-}
-
 // ===== VALIDATION FUNCTIONS =====
 
-/**
- * Validate price input
- */
 function validatePrice(price) {
   const parsed = parseFloat(price);
   if (isNaN(parsed) || parsed <= 0) {
@@ -156,9 +306,6 @@ function validatePrice(price) {
   return { valid: true, value: parsed };
 }
 
-/**
- * Validate barcode input
- */
 function validateBarcode(barcode) {
   const trimmed = barcode.trim();
   if (!trimmed || trimmed.length < 3) {
@@ -167,9 +314,6 @@ function validateBarcode(barcode) {
   return { valid: true, value: trimmed };
 }
 
-/**
- * Validate product name
- */
 function validateProductName(name) {
   const trimmed = name.trim();
   if (!trimmed || trimmed.length < 2) {
@@ -180,9 +324,6 @@ function validateProductName(name) {
 
 // ===== LOGIN/LOGOUT FUNCTIONS =====
 
-/**
- * Handle login
- */
 async function handleLogin(event) {
   event.preventDefault();
 
@@ -205,18 +346,12 @@ async function handleLogin(event) {
   }
 }
 
-/**
- * Handle logout
- */
 function handleLogout(event) {
   event.preventDefault();
   localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_IN);
   location.reload();
 }
 
-/**
- * Show app screen
- */
 function showApp() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appScreen').style.display = 'block';
@@ -226,22 +361,16 @@ function showApp() {
 
 // ===== TAB FUNCTIONS =====
 
-/**
- * Switch between tabs
- */
 function switchTab(tabName, button) {
-  // Update tab buttons
   document.querySelectorAll('.tab').forEach((tab) => {
     tab.classList.remove('active');
     tab.setAttribute('aria-selected', 'false');
   });
 
-  // Update tab content
   document.querySelectorAll('.tab-content').forEach((content) => {
     content.classList.remove('active');
   });
 
-  // Activate selected tab
   button.classList.add('active');
   button.setAttribute('aria-selected', 'true');
   const tabContent = document.getElementById(tabName + 'Tab');
@@ -254,9 +383,6 @@ function switchTab(tabName, button) {
 
 // ===== SCANNER FUNCTIONS =====
 
-/**
- * Start barcode scanner
- */
 function startScanner() {
   const video = document.getElementById('video');
   const startBtn = document.getElementById('startScanBtn');
@@ -301,9 +427,6 @@ function startScanner() {
   });
 }
 
-/**
- * Stop barcode scanner
- */
 function stopScanner() {
   if (AppState.isScanning) {
     Quagga.stop();
@@ -321,94 +444,153 @@ function stopScanner() {
 
 // ===== PRICE DISPLAY FUNCTIONS =====
 
-/**
- * Get prices for a specific barcode
- */
-function getPricesForBarcode(barcode) {
-  const allPrices = getPrices();
-  return allPrices
-    .filter((p) => p.barcode === barcode)
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
-}
-
-/**
- * Show price comparison for scanned barcode
- */
 function showPriceComparison(barcode) {
-  const prices = getPricesForBarcode(barcode);
+  const prices = AppState.db.getAllCurrentPricesForBarcode(barcode);
+  const product = AppState.db.data.products[barcode];
   const resultDiv = document.getElementById('scanResult');
 
   if (prices.length === 0) {
     resultDiv.innerHTML = `
-            <div class="comparison-result">
-                <div class="barcode-display">${sanitizeHTML('Barcode: ' + barcode)}</div>
-                <div class="no-data">No prices found for this product. Add one!</div>
-                <button data-barcode="${sanitizeHTML(barcode)}" class="fill-form-btn">Add Price</button>
-            </div>
-        `;
+      <div class="comparison-result">
+        <div class="barcode-display">${sanitizeHTML('Barcode: ' + barcode)}</div>
+        <div class="no-data">No prices found for this product. Add one!</div>
+        <button data-barcode="${sanitizeHTML(barcode)}" class="fill-form-btn">Add Price</button>
+      </div>
+    `;
 
-    // Add event listener to the dynamically created button
     resultDiv.querySelector('.fill-form-btn').addEventListener('click', function () {
       fillAddForm(this.dataset.barcode);
     });
     return;
   }
 
-  // Find best price
   const bestPrice = Math.min(...prices.map((p) => p.price));
-  const sanitizedProductName = sanitizeHTML(prices[0].productName);
+  const productName = sanitizeHTML(product?.productName || 'Unknown Product');
 
   let html = `
-        <div class="comparison-result">
-            <div class="barcode-display">${sanitizeHTML('Barcode: ' + barcode)}</div>
-            <div class="product-name">${sanitizedProductName}</div>
-    `;
+    <div class="comparison-result">
+      <div class="barcode-display">${sanitizeHTML('Barcode: ' + barcode)}</div>
+      <div class="product-name">${productName}</div>
+  `;
 
   prices.forEach((p) => {
     const isBest = p.price === bestPrice;
+    const variant = AppState.db.data.productVariants[p.variant];
+    const sizeDisplay = variant?.size ? ` (${sanitizeHTML(variant.size)})` : '';
+    const unitPriceDisplay = p.unitPrice ? ` • $${p.unitPrice.toFixed(2)}/unit` : '';
+    const history = AppState.db.getPriceHistory(p.barcode, p.store, variant?.size || '');
+
     html += `
-            <div class="price-item ${isBest ? 'best-price' : ''}">
-                <div>
-                    <div class="store-name">${sanitizeHTML(p.store)}</div>
-                    <div class="date">${sanitizeHTML(new Date(p.date).toLocaleDateString())}</div>
-                </div>
-                <div class="price">$${p.price.toFixed(2)}</div>
-            </div>
-        `;
+      <div class="price-item ${isBest ? 'best-price' : ''}">
+        <div>
+          <div class="store-name">${sanitizeHTML(p.store)}${sizeDisplay}</div>
+          <div class="date">${sanitizeHTML(new Date(p.date).toLocaleDateString())}${unitPriceDisplay}</div>
+          ${history.length > 1 ? `<div class="history-link" style="font-size: 12px; color: #667eea; cursor: pointer;" data-price-id="${p.id}">View history (${history.length} entries) →</div>` : ''}
+        </div>
+        <div>
+          <div class="price">$${p.price.toFixed(2)}</div>
+          <button class="edit-price-btn" data-price-id="${p.id}" style="font-size: 12px; padding: 4px 8px; margin-top: 5px; width: auto;">Edit</button>
+        </div>
+      </div>
+    `;
   });
 
   html += `
-            <button data-barcode="${sanitizeHTML(barcode)}" data-product="${sanitizeHTML(prices[0].productName)}" class="update-price-btn">Update Price</button>
-        </div>
-    `;
+    <button data-barcode="${sanitizeHTML(barcode)}" data-product="${sanitizeHTML(product?.productName || '')}" class="update-price-btn">Add Another Price</button>
+  </div>
+  `;
 
   resultDiv.innerHTML = html;
 
-  // Add event listener to the dynamically created button
   resultDiv.querySelector('.update-price-btn').addEventListener('click', function () {
     fillAddForm(this.dataset.barcode, this.dataset.product);
   });
+
+  resultDiv.querySelectorAll('.edit-price-btn').forEach((btn) => {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      showEditPriceDialog(this.dataset.priceId);
+    });
+  });
+
+  resultDiv.querySelectorAll('.history-link').forEach((link) => {
+    link.addEventListener('click', function (e) {
+      e.stopPropagation();
+      showPriceHistoryDialog(this.dataset.priceId);
+    });
+  });
 }
 
-/**
- * Fill the add form with barcode and product name
- */
+function showEditPriceDialog(priceId) {
+  const priceEntry = AppState.db.data.prices[priceId];
+  if (!priceEntry) return;
+
+  const newPrice = prompt(
+    `Edit price for ${priceEntry.store}:\nCurrent: $${priceEntry.price.toFixed(2)}\n\nEnter new price:`
+  );
+
+  if (newPrice === null) return;
+
+  const validation = validatePrice(newPrice);
+  if (!validation.valid) {
+    showError(validation.error);
+    return;
+  }
+
+  try {
+    AppState.db.updatePrice(priceId, validation.value);
+    showSuccess('Price updated successfully!');
+    showPriceComparison(priceEntry.barcode);
+  } catch (e) {
+    showError('Failed to update price');
+    console.error(e);
+  }
+}
+
+function showPriceHistoryDialog(priceId) {
+  const priceEntry = AppState.db.data.prices[priceId];
+  if (!priceEntry) return;
+
+  const variant = AppState.db.data.productVariants[priceEntry.variant];
+  const history = AppState.db.getPriceHistory(
+    priceEntry.barcode,
+    priceEntry.store,
+    variant?.size || ''
+  );
+
+  let message = `Price History for ${priceEntry.store}`;
+  if (variant?.size) {
+    message += ` (${variant.size})`;
+  }
+  message += ':\n\n';
+
+  history
+    .slice()
+    .reverse()
+    .forEach((h, index) => {
+      const date = new Date(h.date).toLocaleDateString();
+      const unitPrice = h.unitPrice ? ` ($${h.unitPrice.toFixed(2)}/unit)` : '';
+      message += `${date}: $${h.price.toFixed(2)}${unitPrice}`;
+      if (index === 0) message += ' ← Current';
+      message += '\n';
+    });
+
+  alert(message);
+}
+
 function fillAddForm(barcode, productName = '') {
-  // Switch to add tab
   const addTabBtn = document.getElementById('addTabBtn');
   switchTab('add', addTabBtn);
 
-  // Fill form fields
   document.getElementById('barcode').value = barcode;
   document.getElementById('productName').value = productName;
+  document.getElementById('productSizeValue').value = '';
+  document.getElementById('productSizeUnit').value = '';
   document.getElementById('price').focus();
 }
 
 // ===== PRICE MANAGEMENT FUNCTIONS =====
 
-/**
- * Handle adding a new price
- */
 function handleAddPrice(event) {
   event.preventDefault();
 
@@ -416,8 +598,9 @@ function handleAddPrice(event) {
   const productNameInput = document.getElementById('productName').value;
   const store = document.getElementById('store').value;
   const priceInput = document.getElementById('price').value;
+  const sizeValue = document.getElementById('productSizeValue').value.trim();
+  const sizeUnit = document.getElementById('productSizeUnit').value.trim();
 
-  // Validate inputs
   const barcodeValidation = validateBarcode(barcodeInput);
   if (!barcodeValidation.valid) {
     showError(barcodeValidation.error);
@@ -436,93 +619,108 @@ function handleAddPrice(event) {
     return;
   }
 
-  const priceData = {
-    barcode: barcodeValidation.value,
-    productName: nameValidation.value,
-    store: store,
-    price: priceValidation.value,
-    date: new Date().toISOString(),
-  };
+  // Build size string from value and unit
+  let sizeString = '';
+  if (sizeValue && sizeUnit) {
+    sizeString = sizeValue + sizeUnit;
+  } else if (sizeValue && !sizeUnit) {
+    showError('Please select a unit for the size');
+    return;
+  } else if (!sizeValue && sizeUnit) {
+    showError('Please enter a size value');
+    return;
+  }
 
-  // Save to localStorage
-  const allPrices = getPrices();
-  allPrices.push(priceData);
+  try {
+    AppState.db.addPrice(
+      barcodeValidation.value,
+      nameValidation.value,
+      store,
+      priceValidation.value,
+      sizeString
+    );
 
-  if (savePrices(allPrices)) {
-    // Clear form
     document.getElementById('addPriceForm').reset();
     showSuccess('Price added successfully!');
     updateSyncStatus();
+  } catch (e) {
+    showError('Failed to add price');
+    console.error(e);
   }
 }
 
-/**
- * Load and display product list
- */
 function loadProductList() {
-  const allPrices = getPrices();
   const listDiv = document.getElementById('productList');
+  const products = AppState.db.data.products;
 
-  if (allPrices.length === 0) {
+  if (Object.keys(products).length === 0) {
     listDiv.innerHTML = '<div class="no-data">No prices recorded yet. Start by adding some!</div>';
     return;
   }
 
-  // Group by product
-  const products = {};
-  allPrices.forEach((p) => {
-    if (!products[p.barcode]) {
-      products[p.barcode] = {
-        name: p.productName,
-        prices: [],
-      };
-    }
-    products[p.barcode].prices.push(p);
-  });
-
   let html = '';
   Object.keys(products).forEach((barcode) => {
     const product = products[barcode];
-    const bestPrice = Math.min(...product.prices.map((p) => p.price));
+    const prices = AppState.db.getAllCurrentPricesForBarcode(barcode);
+
+    if (prices.length === 0) return;
+
+    const bestPrice = Math.min(...prices.map((p) => p.price));
 
     html += `<div class="comparison-result">`;
-    html += `<div class="product-name">${sanitizeHTML(product.name)}</div>`;
+    html += `<div class="product-name">${sanitizeHTML(product.productName)}</div>`;
     html += `<div class="barcode-display">${sanitizeHTML('Barcode: ' + barcode)}</div>`;
 
-    product.prices
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .forEach((p) => {
-        const isBest = p.price === bestPrice;
-        html += `
-                <div class="price-item ${isBest ? 'best-price' : ''}">
-                    <div>
-                        <div class="store-name">${sanitizeHTML(p.store)}</div>
-                        <div class="date">${sanitizeHTML(new Date(p.date).toLocaleDateString())}</div>
-                    </div>
-                    <div class="price">$${p.price.toFixed(2)}</div>
-                </div>
-            `;
-      });
+    prices.forEach((p) => {
+      const isBest = p.price === bestPrice;
+      const variant = AppState.db.data.productVariants[p.variant];
+      const sizeDisplay = variant?.size ? ` (${sanitizeHTML(variant.size)})` : '';
+      const unitPriceDisplay = p.unitPrice ? ` • ${p.unitPrice.toFixed(2)}/unit` : '';
+      const history = AppState.db.getPriceHistory(p.barcode, p.store, variant?.size || '');
+
+      html += `
+        <div class="price-item ${isBest ? 'best-price' : ''}">
+          <div>
+            <div class="store-name">${sanitizeHTML(p.store)}${sizeDisplay}</div>
+            <div class="date">${sanitizeHTML(new Date(p.date).toLocaleDateString())}${unitPriceDisplay}</div>
+            ${history.length > 1 ? `<div class="history-link" style="font-size: 12px; color: #667eea; cursor: pointer;" data-price-id="${p.id}">View history (${history.length} entries) →</div>` : ''}
+          </div>
+          <div>
+            <div class="price">${p.price.toFixed(2)}</div>
+            <button class="edit-price-btn" data-price-id="${p.id}" style="font-size: 12px; padding: 4px 8px; margin-top: 5px; width: auto;">Edit</button>
+          </div>
+        </div>
+      `;
+    });
 
     html += `</div>`;
   });
 
   listDiv.innerHTML = html;
+
+  // Add event listeners for edit and history buttons
+  listDiv.querySelectorAll('.edit-price-btn').forEach((btn) => {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      showEditPriceDialog(this.dataset.priceId);
+    });
+  });
+
+  listDiv.querySelectorAll('.history-link').forEach((link) => {
+    link.addEventListener('click', function (e) {
+      e.stopPropagation();
+      showPriceHistoryDialog(this.dataset.priceId);
+    });
+  });
 }
 
 // ===== SYNC FUNCTIONS =====
 
-/**
- * Sync data (placeholder for Firebase)
- */
 function handleSync() {
   updateSyncStatus();
   showSuccess('Sync functionality will be added with Firebase integration!');
 }
 
-/**
- * Update sync status display
- */
 function updateSyncStatus() {
   const lastSync = getStorageItem(STORAGE_KEYS.LAST_SYNC);
   const statusDiv = document.getElementById('syncStatus');
@@ -543,11 +741,7 @@ function updateSyncStatus() {
 
 // ===== INITIALIZATION =====
 
-/**
- * Initialize event listeners
- */
 function initializeEventListeners() {
-  // Login
   document.getElementById('loginBtn').addEventListener('click', handleLogin);
   document.getElementById('password').addEventListener('keypress', function (e) {
     if (e.key === 'Enter') {
@@ -555,10 +749,8 @@ function initializeEventListeners() {
     }
   });
 
-  // Logout
   document.getElementById('logoutBtn').addEventListener('click', handleLogout);
 
-  // Tabs
   document.getElementById('scanTabBtn').addEventListener('click', function () {
     switchTab('scan', this);
   });
@@ -569,31 +761,23 @@ function initializeEventListeners() {
     switchTab('view', this);
   });
 
-  // Scanner
   document.getElementById('startScanBtn').addEventListener('click', startScanner);
   document.getElementById('stopScanBtn').addEventListener('click', stopScanner);
 
-  // Add price form
   document.getElementById('addPriceForm').addEventListener('submit', handleAddPrice);
 
-  // Sync
   document.getElementById('syncBtn').addEventListener('click', handleSync);
 }
 
-/**
- * Initialize the app
- */
 function init() {
-  // Set up event listeners
+  AppState.db = new PriceTrackerDB();
   initializeEventListeners();
 
-  // Check if already logged in
   if (getStorageItem(STORAGE_KEYS.IS_LOGGED_IN) === 'true') {
     showApp();
   }
 }
 
-// Start the app when DOM is ready (only in browser, not during tests)
 if (typeof module === 'undefined' || !module.exports) {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
@@ -602,18 +786,13 @@ if (typeof module === 'undefined' || !module.exports) {
   }
 }
 
-// Export functions for testing (only in Node.js environment)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    PriceTrackerDB,
     validatePrice,
     validateBarcode,
     validateProductName,
     sanitizeHTML,
     hashPassword,
-    getPrices,
-    savePrices,
-    getStorageItem,
-    setStorageItem,
-    getPricesForBarcode,
   };
 }

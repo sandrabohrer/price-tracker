@@ -28,7 +28,7 @@
       </div>
 
       <!-- App Screen -->
-      <div class="app-screen" id="appScreen">
+      <div class="app-screen" id="appScreen" style="display: none">
         <h1>🛒 Price Tracker</h1>
         <div class="sync-status" id="syncStatus" role="status">Last synced: Never</div>
         <button id="syncBtn" class="success-btn" aria-label="Sync data with cloud">
@@ -100,6 +100,36 @@
                 aria-label="Product name"
                 required
               />
+            </div>
+            <div class="input-group">
+              <label for="productSize">Product Size (optional)</label>
+              <div style="display: flex; gap: 10px">
+                <input
+                  type="number"
+                  id="productSizeValue"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="16"
+                  aria-label="Product size value"
+                  style="flex: 2"
+                />
+                <select id="productSizeUnit" aria-label="Product size unit" style="flex: 1">
+                  <option value="">Unit</option>
+                  <option value="oz">oz</option>
+                  <option value="lb">lb</option>
+                  <option value="g">g</option>
+                  <option value="kg">kg</option>
+                  <option value="ml">ml</option>
+                  <option value="l">L</option>
+                  <option value="fl oz">fl oz</option>
+                  <option value="qt">qt</option>
+                  <option value="gal">gal</option>
+                  <option value="ct">ct (count)</option>
+                </select>
+              </div>
+              <small style="color: #666; font-size: 12px"
+                >Enter size to calculate unit prices for comparison</small
+              >
             </div>
             <div class="input-group">
               <label for="store">Store</label>
