@@ -1,325 +1,330 @@
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-    padding: 20px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  padding: 20px;
 }
 
 .container {
-    max-width: 600px;
-    margin: 0 auto;
-    background: white;
-    border-radius: 20px;
-    padding: 30px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  max-width: 600px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 .login-screen {
-    text-align: center;
+  text-align: center;
 }
 
 .app-screen {
-    display: none;
+  display: none;
 }
 
 h1 {
-    color: #667eea;
-    margin-bottom: 10px;
-    font-size: 28px;
+  color: #667eea;
+  margin-bottom: 10px;
+  font-size: 28px;
 }
 
 .subtitle {
-    color: #666;
-    margin-bottom: 30px;
-    font-size: 14px;
+  color: #666;
+  margin-bottom: 30px;
+  font-size: 14px;
 }
 
 .input-group {
-    margin-bottom: 20px;
+  margin-bottom: 20px;
 }
 
 label {
-    display: block;
-    margin-bottom: 8px;
-    color: #333;
-    font-weight: 600;
-    font-size: 14px;
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-weight: 600;
+  font-size: 14px;
 }
 
-input, select {
-    width: 100%;
-    padding: 12px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 16px;
-    transition: border-color 0.3s;
+input,
+select {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.3s;
 }
 
-input:focus, select:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 input:invalid:not(:placeholder-shown) {
-    border-color: #dc3545;
+  border-color: #dc3545;
 }
 
 button {
-    width: 100%;
-    padding: 14px;
-    background: #667eea;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.3s, transform 0.1s;
-    margin-bottom: 10px;
+  width: 100%;
+  padding: 14px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.3s,
+    transform 0.1s;
+  margin-bottom: 10px;
 }
 
 button:hover {
-    background: #5568d3;
+  background: #5568d3;
 }
 
 button:active {
-    transform: scale(0.98);
+  transform: scale(0.98);
 }
 
 button:focus {
-    outline: 2px solid #667eea;
-    outline-offset: 2px;
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
 }
 
 button:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-    opacity: 0.6;
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .secondary-btn {
-    background: #6c757d;
+  background: #6c757d;
 }
 
 .secondary-btn:hover:not(:disabled) {
-    background: #5a6268;
+  background: #5a6268;
 }
 
 .success-btn {
-    background: #28a745;
+  background: #28a745;
 }
 
 .success-btn:hover:not(:disabled) {
-    background: #218838;
+  background: #218838;
 }
 
 .danger-btn {
-    background: #dc3545;
-    width: auto;
-    padding: 8px 16px;
-    font-size: 14px;
-    margin: 0;
+  background: #dc3545;
+  width: auto;
+  padding: 8px 16px;
+  font-size: 14px;
+  margin: 0;
 }
 
 .danger-btn:hover:not(:disabled) {
-    background: #c82333;
+  background: #c82333;
 }
 
 #video {
-    width: 100%;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    background: #000;
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  background: #000;
 }
 
 .scanner-container {
-    position: relative;
-    margin-bottom: 20px;
+  position: relative;
+  margin-bottom: 20px;
 }
 
 .comparison-result {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
 }
 
 .price-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px;
-    background: white;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .price-item.best-price {
-    background: #d4edda;
-    border: 2px solid #28a745;
+  background: #d4edda;
+  border: 2px solid #28a745;
 }
 
 .store-name {
-    font-weight: 600;
-    color: #333;
+  font-weight: 600;
+  color: #333;
 }
 
 .price {
-    font-size: 20px;
-    font-weight: 700;
-    color: #667eea;
+  font-size: 20px;
+  font-weight: 700;
+  color: #667eea;
 }
 
 .best-price .price {
-    color: #28a745;
+  color: #28a745;
 }
 
 .date {
-    font-size: 12px;
-    color: #666;
+  font-size: 12px;
+  color: #666;
 }
 
 .product-name {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 15px;
-    color: #333;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #333;
 }
 
 .sync-status {
-    text-align: center;
-    padding: 10px;
-    background: #e7f3ff;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    font-size: 14px;
-    color: #0066cc;
+  text-align: center;
+  padding: 10px;
+  background: #e7f3ff;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #0066cc;
 }
 
 .tabs {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
 .tab {
-    flex: 1;
-    padding: 12px;
-    background: #e0e0e0;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
+  flex: 1;
+  padding: 12px;
+  background: #e0e0e0;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
 }
 
 .tab.active {
-    background: #667eea;
-    color: white;
+  background: #667eea;
+  color: white;
 }
 
-.tab[aria-selected="true"] {
-    background: #667eea;
-    color: white;
+.tab[aria-selected='true'] {
+  background: #667eea;
+  color: white;
 }
 
 .tab-content {
-    display: none;
+  display: none;
 }
 
 .tab-content.active {
-    display: block;
+  display: block;
 }
 
 .product-list {
-    max-height: 400px;
-    overflow-y: auto;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .no-data {
-    text-align: center;
-    padding: 40px;
-    color: #999;
+  text-align: center;
+  padding: 40px;
+  color: #999;
 }
 
 .hidden {
-    display: none;
+  display: none;
 }
 
 .logout-btn {
-    background: #dc3545;
-    margin-top: 20px;
+  background: #dc3545;
+  margin-top: 20px;
 }
 
 .logout-btn:hover:not(:disabled) {
-    background: #c82333;
+  background: #c82333;
 }
 
 .barcode-display {
-    text-align: center;
-    font-family: 'Courier New', monospace;
-    font-size: 18px;
-    color: #666;
-    margin-bottom: 10px;
-    padding: 10px;
-    background: #f8f9fa;
-    border-radius: 8px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  color: #666;
+  margin-bottom: 10px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 8px;
 }
 
 .error-message {
-    background: #f8d7da;
-    color: #721c24;
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    border: 1px solid #f5c6cb;
+  background: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  border: 1px solid #f5c6cb;
 }
 
 /* Toast notifications */
 .toast {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: #dc3545;
-    color: white;
-    padding: 16px 24px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    z-index: 1000;
-    animation: slideIn 0.3s ease-out;
-    max-width: 400px;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #dc3545;
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out;
+  max-width: 400px;
 }
 
 .toast-success {
-    background: #28a745;
+  background: #28a745;
 }
 
 @keyframes slideIn {
-    from {
-        transform: translateX(400px);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Focus visible for better keyboard navigation */
 *:focus-visible {
-    outline: 2px solid #667eea;
-    outline-offset: 2px;
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
 }
 
 /* Loading state */
 .loading {
-    opacity: 0.6;
-    pointer-events: none;
+  opacity: 0.6;
+  pointer-events: none;
 }
