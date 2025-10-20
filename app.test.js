@@ -10,13 +10,30 @@ const {
   validateProductName,
   sanitizeHTML,
   hashPassword,
+  validateAddPriceForm,
 } = require('./app.js');
 
-// Mock DOM elements needed for error messages
+// Mock DOM elements needed for error messages and form validation
 beforeAll(() => {
   document.body.innerHTML = `
     <div id="errorToast"></div>
     <div id="successToast"></div>
+    <form id="addPriceForm">
+      <input type="text" id="barcode" required />
+      <input type="text" id="productName" required />
+      <input type="number" id="productSizeValue" step="0.01" />
+      <select id="productSizeUnit">
+        <option value="">Unit</option>
+        <option value="oz">oz</option>
+      </select>
+      <select id="store" required>
+        <option value="Aldi">Aldi</option>
+      </select>
+      <input type="number" id="price" step="0.01" required />
+      <button type="submit" id="addPriceBtn" disabled>Add Price</button>
+      <small id="sizeError" style="display: none;"></small>
+      <small id="priceError" style="display: none;"></small>
+    </form>
   `;
 });
 
@@ -29,6 +46,12 @@ describe('Price Tracker App', () => {
       expect(validatePrice('10.99').value).toBe(10.99);
       expect(validatePrice('100').valid).toBe(true);
       expect(validatePrice('0.01').valid).toBe(true);
+    });
+
+    test('accepts prices with up to 2 decimal places', () => {
+      expect(validatePrice('10.99').valid).toBe(true);
+      expect(validatePrice('10.9').valid).toBe(true);
+      expect(validatePrice('10').valid).toBe(true);
     });
 
     test('rejects zero price', () => {
@@ -531,6 +554,180 @@ describe('Price Tracker App', () => {
 
         jest.restoreAllMocks();
       });
+    });
+  });
+
+  // ===== FORM VALIDATION =====
+
+  describe('validateAddPriceForm', () => {
+    beforeEach(() => {
+      // Reset form to empty state
+      document.getElementById('barcode').value = '';
+      document.getElementById('productName').value = '';
+      document.getElementById('price').value = '';
+      document.getElementById('productSizeValue').value = '';
+      document.getElementById('productSizeUnit').value = '';
+      document.getElementById('sizeError').style.display = 'none';
+      document.getElementById('priceError').style.display = 'none';
+      document.getElementById('addPriceBtn').disabled = true;
+    });
+
+    test('disables button when all fields are empty', () => {
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(true);
+    });
+
+    test('enables button when all required fields are valid', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '10.99';
+
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(false);
+    });
+
+    test('disables button when barcode is too short', () => {
+      document.getElementById('barcode').value = '12';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '10.99';
+
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(true);
+    });
+
+    test('disables button when product name is too short', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'A';
+      document.getElementById('price').value = '10.99';
+
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(true);
+    });
+
+    test('disables button when price is zero', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '0';
+
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(true);
+    });
+
+    test('disables button when price is negative', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '-5.99';
+
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(true);
+    });
+
+    test('disables button and shows error for price with more than 2 decimal places', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '10.999';
+
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(true);
+      expect(document.getElementById('priceError').style.display).toBe('block');
+      expect(document.getElementById('priceError').textContent).toContain('2 decimal places');
+    });
+
+    test('allows price with 0, 1, or 2 decimal places', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+
+      // No decimal places
+      document.getElementById('price').value = '10';
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(false);
+
+      // 1 decimal place
+      document.getElementById('price').value = '10.5';
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(false);
+
+      // 2 decimal places
+      document.getElementById('price').value = '10.99';
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(false);
+    });
+
+    test('disables button and shows error when size value without unit', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '10.99';
+      document.getElementById('productSizeValue').value = '16';
+      document.getElementById('productSizeUnit').value = '';
+
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(true);
+      expect(document.getElementById('sizeError').style.display).toBe('block');
+      expect(document.getElementById('sizeError').textContent).toContain('select a unit');
+    });
+
+    test('disables button and shows error when unit without size value', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '10.99';
+      document.getElementById('productSizeValue').value = '';
+      document.getElementById('productSizeUnit').value = 'oz';
+
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(true);
+      expect(document.getElementById('sizeError').style.display).toBe('block');
+      expect(document.getElementById('sizeError').textContent).toContain('enter a size value');
+    });
+
+    test('enables button when both size value and unit are provided', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '10.99';
+      document.getElementById('productSizeValue').value = '16';
+      document.getElementById('productSizeUnit').value = 'oz';
+
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(false);
+      expect(document.getElementById('sizeError').style.display).toBe('none');
+    });
+
+    test('enables button when both size fields are empty', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '10.99';
+      document.getElementById('productSizeValue').value = '';
+      document.getElementById('productSizeUnit').value = '';
+
+      validateAddPriceForm();
+      expect(document.getElementById('addPriceBtn').disabled).toBe(false);
+    });
+
+    test('clears error messages when validation passes', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '10.99';
+
+      validateAddPriceForm();
+      expect(document.getElementById('sizeError').style.display).toBe('none');
+      expect(document.getElementById('priceError').style.display).toBe('none');
+    });
+
+    test('returns true when form is valid', () => {
+      document.getElementById('barcode').value = '123456';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '10.99';
+
+      const result = validateAddPriceForm();
+      expect(result).toBe(true);
+    });
+
+    test('returns false when form is invalid', () => {
+      document.getElementById('barcode').value = '12';
+      document.getElementById('productName').value = 'Test Product';
+      document.getElementById('price').value = '10.99';
+
+      const result = validateAddPriceForm();
+      expect(result).toBe(false);
     });
   });
 });

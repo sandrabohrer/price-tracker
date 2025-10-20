@@ -130,10 +130,11 @@
               <small style="color: #666; font-size: 12px"
                 >Enter size to calculate unit prices for comparison</small
               >
+              <small id="sizeError" style="color: #dc3545; font-size: 12px; display: none"></small>
             </div>
             <div class="input-group">
               <label for="store">Store</label>
-              <select id="store" aria-label="Select store">
+              <select id="store" aria-label="Select store" required>
                 <option value="Aldi">Aldi</option>
                 <option value="Wegmans">Wegmans</option>
                 <option value="BJ's">BJ's</option>
@@ -151,8 +152,9 @@
                 aria-label="Product price in dollars"
                 required
               />
+              <small id="priceError" style="color: #dc3545; font-size: 12px; display: none"></small>
             </div>
-            <button type="submit" id="addPriceBtn" aria-label="Add price to tracker">
+            <button type="submit" id="addPriceBtn" aria-label="Add price to tracker" disabled>
               Add Price
             </button>
           </form>
