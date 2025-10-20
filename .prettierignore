@@ -1,0 +1,13 @@
+# Dependencies
+node_modules
+
+# Test coverage
+coverage
+
+# Build/distribution files
+dist
+build
+*.min.js
+
+# Lock files
+package-lock.json

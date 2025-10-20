@@ -1,91 +1,155 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Price Tracker</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
     <div class="container">
-        <!-- Login Screen -->
-        <div class="login-screen" id="loginScreen">
-            <h1>🛒 Price Tracker</h1>
-            <p class="subtitle">Track and compare prices across your favorite stores</p>
+      <!-- Login Screen -->
+      <div class="login-screen" id="loginScreen">
+        <h1>🛒 Price Tracker</h1>
+        <p class="subtitle">Track and compare prices across your favorite stores</p>
+        <div class="input-group">
+          <label for="password">Enter Password</label>
+          <input
+            type="password"
+            id="password"
+            placeholder="Enter password"
+            aria-label="Password input"
+          />
+        </div>
+        <button id="loginBtn" aria-label="Login to price tracker">Login</button>
+        <div id="loginError" class="error-message hidden" role="alert">
+          Incorrect password. Please try again.
+        </div>
+      </div>
+
+      <!-- App Screen -->
+      <div class="app-screen" id="appScreen">
+        <h1>🛒 Price Tracker</h1>
+        <div class="sync-status" id="syncStatus" role="status">Last synced: Never</div>
+        <button id="syncBtn" class="success-btn" aria-label="Sync data with cloud">
+          🔄 Sync Data
+        </button>
+
+        <!-- Tabs -->
+        <div class="tabs" role="tablist">
+          <button
+            class="tab active"
+            id="scanTabBtn"
+            role="tab"
+            aria-selected="true"
+            aria-controls="scanTab"
+          >
+            Scan
+          </button>
+          <button
+            class="tab"
+            id="addTabBtn"
+            role="tab"
+            aria-selected="false"
+            aria-controls="addTab"
+          >
+            Add Price
+          </button>
+          <button
+            class="tab"
+            id="viewTabBtn"
+            role="tab"
+            aria-selected="false"
+            aria-controls="viewTab"
+          >
+            View All
+          </button>
+        </div>
+
+        <!-- Scan Tab -->
+        <div class="tab-content active" id="scanTab" role="tabpanel" aria-labelledby="scanTabBtn">
+          <div class="scanner-container">
+            <video id="video" class="hidden" aria-label="Barcode scanner video feed"></video>
+            <button id="startScanBtn" aria-label="Start barcode scanner">📷 Start Scanner</button>
+            <button id="stopScanBtn" class="secondary-btn hidden" aria-label="Stop barcode scanner">
+              Stop Scanner
+            </button>
+          </div>
+          <div id="scanResult"></div>
+        </div>
+
+        <!-- Add Price Tab -->
+        <div class="tab-content" id="addTab" role="tabpanel" aria-labelledby="addTabBtn">
+          <form id="addPriceForm" novalidate>
             <div class="input-group">
-                <label for="password">Enter Password</label>
-                <input type="password" id="password" placeholder="Enter password" aria-label="Password input">
+              <label for="barcode">Barcode</label>
+              <input
+                type="text"
+                id="barcode"
+                placeholder="Enter or scan barcode"
+                aria-label="Product barcode"
+                required
+              />
             </div>
-            <button id="loginBtn" aria-label="Login to price tracker">Login</button>
-            <div id="loginError" class="error-message hidden" role="alert">Incorrect password. Please try again.</div>
+            <div class="input-group">
+              <label for="productName">Product Name</label>
+              <input
+                type="text"
+                id="productName"
+                placeholder="e.g., Coffee Creamer"
+                aria-label="Product name"
+                required
+              />
+            </div>
+            <div class="input-group">
+              <label for="store">Store</label>
+              <select id="store" aria-label="Select store">
+                <option value="Aldi">Aldi</option>
+                <option value="Wegmans">Wegmans</option>
+                <option value="BJ's">BJ's</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label for="price">Price ($)</label>
+              <input
+                type="number"
+                id="price"
+                step="0.01"
+                min="0.01"
+                placeholder="0.00"
+                aria-label="Product price in dollars"
+                required
+              />
+            </div>
+            <button type="submit" id="addPriceBtn" aria-label="Add price to tracker">
+              Add Price
+            </button>
+          </form>
         </div>
 
-        <!-- App Screen -->
-        <div class="app-screen" id="appScreen">
-            <h1>🛒 Price Tracker</h1>
-            <div class="sync-status" id="syncStatus" role="status">Last synced: Never</div>
-            <button id="syncBtn" class="success-btn" aria-label="Sync data with cloud">🔄 Sync Data</button>
-
-            <!-- Tabs -->
-            <div class="tabs" role="tablist">
-                <button class="tab active" id="scanTabBtn" role="tab" aria-selected="true" aria-controls="scanTab">Scan</button>
-                <button class="tab" id="addTabBtn" role="tab" aria-selected="false" aria-controls="addTab">Add Price</button>
-                <button class="tab" id="viewTabBtn" role="tab" aria-selected="false" aria-controls="viewTab">View All</button>
-            </div>
-
-            <!-- Scan Tab -->
-            <div class="tab-content active" id="scanTab" role="tabpanel" aria-labelledby="scanTabBtn">
-                <div class="scanner-container">
-                    <video id="video" class="hidden" aria-label="Barcode scanner video feed"></video>
-                    <button id="startScanBtn" aria-label="Start barcode scanner">📷 Start Scanner</button>
-                    <button id="stopScanBtn" class="secondary-btn hidden" aria-label="Stop barcode scanner">Stop Scanner</button>
-                </div>
-                <div id="scanResult"></div>
-            </div>
-
-            <!-- Add Price Tab -->
-            <div class="tab-content" id="addTab" role="tabpanel" aria-labelledby="addTabBtn">
-                <form id="addPriceForm" novalidate>
-                    <div class="input-group">
-                        <label for="barcode">Barcode</label>
-                        <input type="text" id="barcode" placeholder="Enter or scan barcode" aria-label="Product barcode" required>
-                    </div>
-                    <div class="input-group">
-                        <label for="productName">Product Name</label>
-                        <input type="text" id="productName" placeholder="e.g., Coffee Creamer" aria-label="Product name" required>
-                    </div>
-                    <div class="input-group">
-                        <label for="store">Store</label>
-                        <select id="store" aria-label="Select store">
-                            <option value="Aldi">Aldi</option>
-                            <option value="Wegmans">Wegmans</option>
-                            <option value="BJ's">BJ's</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label for="price">Price ($)</label>
-                        <input type="number" id="price" step="0.01" min="0.01" placeholder="0.00" aria-label="Product price in dollars" required>
-                    </div>
-                    <button type="submit" id="addPriceBtn" aria-label="Add price to tracker">Add Price</button>
-                </form>
-            </div>
-
-            <!-- View All Tab -->
-            <div class="tab-content" id="viewTab" role="tabpanel" aria-labelledby="viewTabBtn">
-                <div id="productList" class="product-list"></div>
-            </div>
-
-            <button id="logoutBtn" class="logout-btn" aria-label="Logout from price tracker">Logout</button>
+        <!-- View All Tab -->
+        <div class="tab-content" id="viewTab" role="tabpanel" aria-labelledby="viewTabBtn">
+          <div id="productList" class="product-list"></div>
         </div>
+
+        <button id="logoutBtn" class="logout-btn" aria-label="Logout from price tracker">
+          Logout
+        </button>
+      </div>
     </div>
 
     <!-- Error Toast -->
     <div id="errorToast" class="toast hidden" role="alert" aria-live="assertive"></div>
     <!-- Success Toast -->
-    <div id="successToast" class="toast toast-success hidden" role="status" aria-live="polite"></div>
+    <div
+      id="successToast"
+      class="toast toast-success hidden"
+      role="status"
+      aria-live="polite"
+    ></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <script src="app.js"></script>
-</body>
+  </body>
 </html>
